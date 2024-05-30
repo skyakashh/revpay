@@ -7,7 +7,6 @@ type User struct {
 }
 
 type Account struct {
-	UserID         uint    `json:"user_id"`
 	AccountID      string  `json:"account_id"`
 	BankAccount    string  `json:"bank_account"`
 	IFSC           string  `json:"ifsc"`
@@ -26,7 +25,6 @@ type UserAuth struct {
 type Response struct {
 	Username    string `json:"username"`
 	Password    string `json:"password"`
-	UserID      uint   `json:"user_id"`
 	AccountID   string `json:"account_id"`
 	BankAccount string `json:"bank_account"`
 	IFSC        string `json:"ifsc"`

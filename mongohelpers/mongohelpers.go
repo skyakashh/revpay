@@ -3,12 +3,14 @@ package mongohelpers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
 	controller "github.com/skyakashh/revpay/controllers"
 	"github.com/skyakashh/revpay/models"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 //for creating user
@@ -30,7 +32,18 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 func username_verify(user models.User) bool {
 	var userVerify models.User
 	err := controller.Collection.FindOne(context.TODO(), bson.M{"username": user.Username}).Decode(&userVerify)
-	return err == nil
+	fmt.Println(userVerify)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			// No document was found
+			fmt.Println("No document found")
+			return true
+		}
+		// Handle other potential errors
+		log.Fatal(err)
+		return false
+	}
+	return false
 }
 
 func createUser(user models.User) models.User {
@@ -62,7 +75,7 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(created)
 }
 
-func account(user models.Response) models.Account {
+func account(user models.Response) models.User {
 
 	if len(user.BankAccount) > 10 || len(user.IFSC) > 8 {
 		log.Fatal("incorrect credentials")
@@ -84,11 +97,13 @@ func account(user models.Response) models.Account {
 
 	userVerify.Accounts = append(userVerify.Accounts, account)
 
-	err1 := controller.Collection.FindOneAndReplace(context.TODO(), bson.M{"username": user.Username, "password": user.Password}, userVerify)
-	if err1 != nil {
-		log.Fatal(err1)
+	filter := bson.M{"username": user.Username, "password": user.Password}
+
+	err = controller.Collection.FindOneAndReplace(context.TODO(), filter, userVerify).Decode(&userVerify)
+	if err != nil {
+		log.Fatal(err)
 	}
-	return account
+	return userVerify
 
 }
 
