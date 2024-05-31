@@ -66,7 +66,7 @@ func authentication(user models.UserAuth) bool {
 
 func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	var user models.Response
+	var user models.Account
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		log.Fatal(err)
 	}
@@ -75,39 +75,24 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(created)
 }
 
-func account(user models.Response) models.User {
+func account(user models.Account) models.Account {
 
 	if len(user.BankAccount) > 10 || len(user.IFSC) > 8 {
 		log.Fatal("incorrect credentials")
 	}
-	var userVerify models.User
-	err := controller.Collection.FindOne(context.TODO(), bson.M{"username": user.Username, "password": user.Password}).Decode(&userVerify)
-	if err != nil {
-		log.Fatal("user not found")
-	}
-	var account models.Account
-	account.AccountID = user.AccountID
-	account.BankAccount = user.BankAccount
-	account.DailyLimit = 1000
-	account.CurrentBalance = 0
-	account.IFSC = user.IFSC
-	account.Status = user.Status
-	account.AllowCredit = user.AllowCredit
-	account.AllowDebit = user.AllowDebit
 
-	userVerify.Accounts = append(userVerify.Accounts, account)
+	user.DailyLimit = 1000
+	user.CurrentBalance = 0
 
-	filter := bson.M{"username": user.Username, "password": user.Password}
-
-	err = controller.Collection.FindOneAndReplace(context.TODO(), filter, userVerify).Decode(&userVerify)
+	_, err := controller.IdCollection.InsertOne(context.TODO(), user)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return userVerify
+	return user
 
 }
 
-// TODO: for withdrawl money
+// TODO: for withdrawl of money
 
 func Withdrawl(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -118,30 +103,32 @@ func Withdrawl(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// finding user in database
-	var userVerify models.User
-	err = controller.Collection.FindOne(context.TODO(), bson.M{"username": user.Username}).Decode(&userVerify)
+	var userVerify models.Account
+	filter := bson.M{"ifsc": user.IFSC, "bankaccount": user.BankAccount}
+	err = controller.IdCollection.FindOne(context.TODO(), filter).Decode(&userVerify)
 	if err != nil {
-		log.Fatal("user not found")
+		log.Fatal(err)
 	}
-	fmt.Println(userVerify)
-	for i, value := range userVerify.Accounts {
-		if value.BankAccount == user.BankAccount && user.IFSC == value.IFSC {
-			if value.DailyLimit < user.Amount {
-				log.Fatal("limit exceede")
-			}
-			// make changes in balance
-			userVerify.Accounts[i].CurrentBalance -= user.Amount
-			//daily limit
-			userVerify.Accounts[i].DailyLimit -= user.Amount
 
-			err = controller.Collection.FindOneAndReplace(context.TODO(), bson.M{"username": user.Username}, userVerify).Decode(&userVerify)
-			if err != nil {
-				log.Fatal(err)
-			}
-			json.NewEncoder(w).Encode(userVerify)
-			return
-		}
+	if userVerify.Status == "INACTIVE" {
+		log.Fatal("status inactive")
 	}
+
+	if userVerify.DailyLimit < user.Amount {
+		log.Fatal("limit exceeded")
+	}
+
+	if userVerify.CurrentBalance < user.Amount {
+		log.Fatal("invalid amount")
+	}
+
+	userVerify.CurrentBalance -= user.Amount
+	userVerify.DailyLimit -= user.Amount
+	err = controller.IdCollection.FindOneAndReplace(context.TODO(), filter, userVerify).Decode(&userVerify)
+	if err != nil {
+		log.Fatal(err)
+	}
+	json.NewEncoder(w).Encode(userVerify)
 
 }
 
@@ -156,38 +143,35 @@ func Deposit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// finding user in database
-	var userVerify models.User
-	err = controller.Collection.FindOne(context.TODO(), bson.M{"username": user.Username}).Decode(&userVerify)
+	var userVerify models.Account
+	filter := bson.M{"ifsc": user.IFSC, "bankaccount": user.BankAccount}
+	err = controller.IdCollection.FindOne(context.TODO(), filter).Decode(&userVerify)
 	if err != nil {
 		log.Fatal("user not found")
 	}
-	fmt.Println(userVerify)
-	for i, value := range userVerify.Accounts {
-		if value.BankAccount == user.BankAccount && user.IFSC == value.IFSC {
-			if value.DailyLimit < user.Amount {
-				log.Fatal("limit exceeded")
-			}
-			if user.PaymentMode == "debit" && !value.AllowDebit {
-				log.Fatal("debit payment mode not allowed for this account")
-			}
-			if user.PaymentMode == "credit" && !value.AllowCredit {
-				log.Fatal("credit payment mode not allowed for this account")
-			}
-			if user.PaymentMode != "credit" && user.PaymentMode != "debit" {
-				log.Fatal("invalid payment mode")
-			}
-			// make changes in balance
-			userVerify.Accounts[i].CurrentBalance += user.Amount
-			//daily limit
-			userVerify.Accounts[i].DailyLimit -= user.Amount
 
-			err = controller.Collection.FindOneAndReplace(context.TODO(), bson.M{"username": user.Username}, userVerify).Decode(&userVerify)
-			if err != nil {
-				log.Fatal(err)
-			}
-			json.NewEncoder(w).Encode(userVerify)
-			return
-		}
+	if userVerify.Status == "INACTIVE" {
+		log.Fatal("status inactive")
 	}
+
+	if userVerify.DailyLimit < user.Amount {
+		log.Fatal("limit exceeded")
+	}
+
+	if user.PaymentMode == "debit" && !userVerify.AllowDebit {
+		log.Fatal("debit payment mode not allowed for this account")
+	}
+
+	if user.PaymentMode == "credit" && !userVerify.AllowCredit {
+		log.Fatal("credit payment mode not allowed for this account")
+	}
+
+	userVerify.CurrentBalance += user.Amount
+	userVerify.DailyLimit -= user.Amount
+	err = controller.IdCollection.FindOneAndReplace(context.TODO(), filter, userVerify).Decode(&userVerify)
+	if err != nil {
+		log.Fatal(err)
+	}
+	json.NewEncoder(w).Encode(userVerify)
 
 }
