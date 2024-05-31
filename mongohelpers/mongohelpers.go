@@ -195,3 +195,25 @@ func Deposit(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(userVerify)
 
 }
+
+// get balance
+
+func GetBalance(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// decoding the response
+	var user models.Balance
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var userVerify models.Account
+	filter := bson.M{"ifsc": user.IFSC, "bankaccount": user.BankAccount}
+	err = controller.IdCollection.FindOne(context.TODO(), filter).Decode(&userVerify)
+	if err != nil {
+		log.Fatal("user not found")
+	}
+
+	json.NewEncoder(w).Encode(map[string]float64{"balance": userVerify.CurrentBalance})
+}

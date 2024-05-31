@@ -21,7 +21,7 @@ type Account struct {
 	AllowCredit    bool               `json:"allow_credit,omitempty"`
 	AllowDebit     bool               `json:"allow_debit,omitempty"`
 	DailyLimit     float64            `json:"daily_limit,omitempty"`
-	CurrentBalance float64            `json:"current_balance,omitempty"`
+	CurrentBalance float64            `json:"currentbalance,omitempty"`
 	LastUpdated    time.Time          `json:"time,omitempty"`
 }
 
@@ -46,4 +46,9 @@ type Deposit struct {
 	IFSC        string  `json:"ifsc"`
 	PaymentMode string  `json:"paymentmode"`
 	Amount      float64 `json:"amount"`
+}
+
+type Balance struct {
+	BankAccount string `json:"bankaccount"`
+	IFSC        string `json:"ifsc"`
 }
