@@ -1,6 +1,10 @@
 package models
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
+import (
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 type User struct {
 	Username string               `json:"username"`
@@ -18,6 +22,7 @@ type Account struct {
 	AllowDebit     bool               `json:"allow_debit,omitempty"`
 	DailyLimit     float64            `json:"daily_limit,omitempty"`
 	CurrentBalance float64            `json:"current_balance,omitempty"`
+	LastUpdated    time.Time          `json:"time,omitempty"`
 }
 
 type UserAuth struct {
@@ -39,6 +44,6 @@ type UserId struct {
 type Deposit struct {
 	BankAccount string  `json:"bankaccount"`
 	IFSC        string  `json:"ifsc"`
-	PaymentMode string  `json:"payment_mode"`
+	PaymentMode string  `json:"paymentmode"`
 	Amount      float64 `json:"amount"`
 }

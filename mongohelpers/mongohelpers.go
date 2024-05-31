@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	controller "github.com/skyakashh/revpay/controllers"
 	"github.com/skyakashh/revpay/models"
@@ -83,7 +84,7 @@ func account(user models.Account) models.Account {
 
 	user.DailyLimit = 1000
 	user.CurrentBalance = 0
-
+	user.LastUpdated = time.Now()
 	_, err := controller.IdCollection.InsertOne(context.TODO(), user)
 	if err != nil {
 		log.Fatal(err)
@@ -108,6 +109,16 @@ func Withdrawl(w http.ResponseWriter, r *http.Request) {
 	err = controller.IdCollection.FindOne(context.TODO(), filter).Decode(&userVerify)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	// update daily limit
+
+	now := time.Now() // Get the current time.
+
+	// Check if the last reset was before the start of the current day.
+	if userVerify.LastUpdated.Before(now.Truncate(24 * time.Hour)) {
+		userVerify.DailyLimit = 1000 // Reset the daily usage to 1000.
+		userVerify.LastUpdated = now // Update the last reset time to the current time.
 	}
 
 	if userVerify.Status == "INACTIVE" {
@@ -152,6 +163,15 @@ func Deposit(w http.ResponseWriter, r *http.Request) {
 
 	if userVerify.Status == "INACTIVE" {
 		log.Fatal("status inactive")
+	}
+
+	// update daily limit
+	now := time.Now() // Get the current time.
+
+	// Check if the last reset was before the start of the current day.
+	if userVerify.LastUpdated.Before(now.Truncate(24 * time.Hour)) {
+		userVerify.DailyLimit = 1000 // Reset the daily usage to 1000.
+		userVerify.LastUpdated = now // Update the last reset time to the current time.
 	}
 
 	if userVerify.DailyLimit < user.Amount {
