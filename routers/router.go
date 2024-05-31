@@ -10,6 +10,7 @@ func Router() *mux.Router {
 
 	r.HandleFunc("/register", mongohelpers.CreateUser).Methods("POST")
 	r.HandleFunc("/account", mongohelpers.CreateAccount).Methods("POST")
-
+	r.HandleFunc("/withdraw", mongohelpers.Withdrawl).Methods("PUT")
+	r.HandleFunc("/deposit", mongohelpers.Deposit).Methods("PUT")
 	return r
 }

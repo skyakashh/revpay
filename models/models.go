@@ -32,3 +32,23 @@ type Response struct {
 	AllowCredit bool   `json:"allow_credit"`
 	AllowDebit  bool   `json:"allow_debit"`
 }
+
+type Withdraw struct {
+	Username    string  `json:"username"`
+	BankAccount string  `json:"bank_account"`
+	IFSC        string  `json:"ifsc"`
+	Amount      float64 `json:"amount"`
+}
+
+type UserId struct {
+	Username  string `json:"username"`
+	AccountId string `json:"account_id"`
+}
+
+type Deposit struct {
+	Username    string  `json:"username"`
+	BankAccount string  `json:"bank_account"`
+	IFSC        string  `json:"ifsc"`
+	PaymentMode string  `json:"payment_mode"`
+	Amount      float64 `json:"amount"`
+}
