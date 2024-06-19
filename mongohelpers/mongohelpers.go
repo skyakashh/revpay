@@ -8,12 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
 	controller "github.com/skyakashh/revpay/controllers"
 	"github.com/skyakashh/revpay/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var hmacSampleSecret = []byte("lqdbgouegwucb")
@@ -32,12 +30,12 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// hashing the password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	user.Password = string(hashedPassword)
-	if err != nil {
-		http.Error(w, "Error hashing password", http.StatusInternalServerError)
-		return
-	}
+	// hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	// user.Password = string(hashedPassword)
+	// if err != nil {
+	// 	http.Error(w, "Error hashing password", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	// creating the user
 	createdUser := createUser(user)
@@ -78,42 +76,40 @@ func Authentication(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(user)
+	//fmt.Println(user)
+	// hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	// user.Password = string(hashedPassword)
 
+	//fmt.Println(string(hashedPassword))
 	var authuser models.User
-	filter := bson.M{"username": user.Username}
+	filter := bson.M{"username": user.Username, "password": user.Password}
 	err = controller.Collection.FindOne(context.TODO(), filter).Decode(&authuser)
 	// return err != nil
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	fmt.Println(authuser)
+	json.NewEncoder(w).Encode(authuser)
 	// verifying the password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if string(hashedPassword) != authuser.Password {
-		log.Fatal("wrong password")
-	}
-	expirationTime := time.Now().Add(5 * time.Minute)
-	claims := &models.UserAuth{
-		Username: user.Username,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-		},
-	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	fmt.Println(token)
-	tokenString, err := token.SignedString(hmacSampleSecret)
-	fmt.Println(tokenString, err)
+	// expirationTime := time.Now().Add(5 * time.Minute)
+	// claims := &models.UserAuth{
+	// 	Username: user.Username,
+	// 	RegisteredClaims: jwt.RegisteredClaims{
+	// 		ExpiresAt: jwt.NewNumericDate(expirationTime),
+	// 	},
+	// }
 
-	http.SetCookie(w, &http.Cookie{
-		Name:    "token",
-		Value:   tokenString,
-		Expires: expirationTime,
-	})
+	// token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	// fmt.Println(token)
+	// tokenString, err := token.SignedString(hmacSampleSecret)
+	// fmt.Println(tokenString, err)
+
+	// http.SetCookie(w, &http.Cookie{
+	// 	Name:    "token",
+	// 	Value:   tokenString,
+	// 	Expires: expirationTime,
+	// })
 }
 
 // Sign and get the complete encoded token as a string using the secret
@@ -194,6 +190,8 @@ func Withdrawl(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	userVerify.CurrentBalance -= user.Amount
+	userVerify.DailyLimit -= user.Amount
 	json.NewEncoder(w).Encode(userVerify)
 
 }
@@ -247,6 +245,8 @@ func Deposit(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	userVerify.CurrentBalance += user.Amount
+	userVerify.DailyLimit -= user.Amount
 	json.NewEncoder(w).Encode(userVerify)
 
 }
