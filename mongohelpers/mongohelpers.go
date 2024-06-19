@@ -8,15 +8,20 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/golang-jwt/jwt/v4"
 	controller "github.com/skyakashh/revpay/controllers"
 	"github.com/skyakashh/revpay/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"golang.org/x/crypto/bcrypt"
 )
+
+var hmacSampleSecret = []byte("lqdbgouegwucb")
 
 //for creating user
 
 func CreateUser(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("request recieved")
 	w.Header().Set("Content-Type", "application/json")
 	var user models.User
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
@@ -25,6 +30,16 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	if !username_verify(user) {
 		log.Fatal("not a unique username")
 	}
+
+	// hashing the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	user.Password = string(hashedPassword)
+	if err != nil {
+		http.Error(w, "Error hashing password", http.StatusInternalServerError)
+		return
+	}
+
+	// creating the user
 	createdUser := createUser(user)
 	json.NewEncoder(w).Encode(createdUser)
 
@@ -57,11 +72,51 @@ func createUser(user models.User) models.User {
 
 // for authenticating password and username
 
-func authentication(user models.UserAuth) bool {
-	var userVerify models.User
-	err := controller.Collection.FindOne(context.TODO(), bson.M{"username": user.Username, "password": user.Password}).Decode(&userVerify)
-	return err != nil
+func Authentication(w http.ResponseWriter, r *http.Request) {
+	var user models.User
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(user)
+
+	var authuser models.User
+	filter := bson.M{"username": user.Username}
+	err = controller.Collection.FindOne(context.TODO(), filter).Decode(&authuser)
+	// return err != nil
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// verifying the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if string(hashedPassword) != authuser.Password {
+		log.Fatal("wrong password")
+	}
+	expirationTime := time.Now().Add(5 * time.Minute)
+	claims := &models.UserAuth{
+		Username: user.Username,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	fmt.Println(token)
+	tokenString, err := token.SignedString(hmacSampleSecret)
+	fmt.Println(tokenString, err)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:    "token",
+		Value:   tokenString,
+		Expires: expirationTime,
+	})
 }
+
+// Sign and get the complete encoded token as a string using the secret
 
 // for creating account
 
@@ -203,6 +258,7 @@ func GetBalance(w http.ResponseWriter, r *http.Request) {
 
 	// decoding the response
 	var user models.Balance
+	fmt.Println(user)
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
 		log.Fatal(err)
